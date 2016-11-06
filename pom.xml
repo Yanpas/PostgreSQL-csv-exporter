@@ -11,9 +11,11 @@
   <url>http://maven.apache.org</url>
 
   <properties>
+  	<maven.compiler.source>1.7</maven.compiler.source>
+    <maven.compiler.target>1.7</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
-  
+
 
   <pluginRepositories>
     <pluginRepository>
@@ -37,7 +39,7 @@
     	<version>[9.1,)</version>
     </dependency>
   </dependencies>
-  
+
 	<build>
 	<plugins>
 		<plugin>
@@ -58,7 +60,7 @@
 			  <execution>
 				<id>make-assembly</id>
                                     <!-- bind to the packaging phase -->
-				<phase>package</phase> 
+				<phase>package</phase>
 				<goals>
 					<goal>single</goal>
 				</goals>
