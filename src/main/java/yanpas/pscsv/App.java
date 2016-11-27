@@ -6,7 +6,7 @@ import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
-import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -61,34 +61,27 @@ class Retriever {
 		Statement st;
 		ArrayList<String> columns = new ArrayList<>();
 
-		try (FileOutputStream fout = new FileOutputStream(out_dir + "/" + table_name + ".csv")) {
+		try (FileWriter fout = new FileWriter(out_dir + "/" + table_name + ".csv")) {
 			st = con.createStatement();
 			rs = st.executeQuery("SELECT * FROM " + table_name);
 			ResultSetMetaData rsmd = rs.getMetaData();
 			int nColumns = rsmd.getColumnCount();
+
 			for (int i = 1; i <= nColumns; ++i) {
 				columns.add(rsmd.getColumnName(i));
-				if (columns.get(i - 1) == null)
-					throw new Exception("Table " + table_name + " constains column without a name");
-				fout.write('\"');
-				fout.write(columns.get(i - 1).getBytes());
-				fout.write('\"');
+				String colName = columns.get(i - 1);
+				fout.write('"'+(colName==null ? "UNNAMED": colName)+'"');
 				if (i < nColumns)
 					fout.write(',');
-				else
-					fout.write('\n');
 			}
+			fout.write('\n');
 
 			while (rs.next()) {
 				for (String col : columns) {
 					String r = rs.getString(col);
-					if (r == null) {
-						fout.write(',');
-						continue;
+					if (r != null) {
+						fout.write('"'+r+'"');
 					}
-					fout.write('\"');
-					fout.write(r.getBytes());
-					fout.write('\"');
 					fout.write(',');
 				}
 				fout.write('\n');
@@ -117,6 +110,53 @@ class Frame extends JFrame {
 			addr_t = new JTextField();
 	private JPanel pan = new JPanel();
 	private JButton but = new JButton("Gather all tables!");
+	private ActionListener alistener = new ActionListener() {
+
+		@Override
+		public void actionPerformed(ActionEvent e) {
+
+			JFileChooser fd = new JFileChooser();
+			fd.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+			fd.showSaveDialog(Frame.this);
+			String outputdir = fd.getSelectedFile().getAbsolutePath();
+			if (outputdir == null)
+				return;
+			if (!new File(outputdir).exists() || !new File(outputdir).isDirectory()) {
+				JOptionPane.showMessageDialog(Frame.this,
+						"Out path: " + outputdir + " is wrong", "Error",
+						JOptionPane.ERROR_MESSAGE);
+				return;
+			}
+
+			try {
+				Retriever r =
+						new Retriever(username_t.getText(), password_t.getText(),
+								db_name_t.getText(), addr_t.getText());
+				r.exportAll(outputdir);
+			} catch (SQLException e1) {
+				e1.printStackTrace();
+				JOptionPane.showMessageDialog(Frame.this,
+						"SQL exception caught:\n" + e1.getMessage()
+								+ "\nStack trace was written to console",
+						"DB Error", JOptionPane.ERROR_MESSAGE);
+				return;
+			} catch (IOException e1) {
+				e1.printStackTrace();
+				JOptionPane.showMessageDialog(Frame.this,
+						"Export exception caught:\n" + e1.getMessage()
+								+ "\nStack trace was written to console",
+						"I/O Error", JOptionPane.ERROR_MESSAGE);
+				return;
+			} catch (Exception e1) {
+				JOptionPane.showMessageDialog(Frame.this,
+						"Exception caught:\n" + e1.getMessage(), "Some other kind of error",
+						JOptionPane.ERROR_MESSAGE);
+				return;
+			}
+			JOptionPane.showMessageDialog(Frame.this, "Completed successfully", "Completed",
+					JOptionPane.INFORMATION_MESSAGE);
+		}
+	};
 
 	public Frame() {
 		try {
@@ -145,56 +185,7 @@ class Frame extends JFrame {
 		add(pan);
 		add(but, BorderLayout.SOUTH);
 
-		but.addActionListener(new ActionListener() {
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-
-				JFileChooser fd = new JFileChooser();
-				fd.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-				fd.showSaveDialog(Frame.this);
-				String outputdir = fd.getSelectedFile().getAbsolutePath();
-				if (outputdir == null)
-					return;
-				try {
-					if (!new File(outputdir).exists() || !new File(outputdir).isDirectory())
-						throw new Exception();
-				} catch (Exception exc) {
-					JOptionPane.showMessageDialog(Frame.this,
-							"Out path: " + outputdir + " is wrong", "Error",
-							JOptionPane.ERROR_MESSAGE);
-					return;
-				}
-
-				try {
-					Retriever r =
-							new Retriever(username_t.getText(), password_t.getText(),
-									db_name_t.getText(), addr_t.getText());
-					r.exportAll(outputdir);
-				} catch (SQLException e1) {
-					e1.printStackTrace();
-					JOptionPane.showMessageDialog(Frame.this,
-							"SQL exception caught:\n" + e1.getMessage()
-									+ "\nStack trace was written to console",
-							"DB Error", JOptionPane.ERROR_MESSAGE);
-					return;
-				} catch (IOException e1) {
-					e1.printStackTrace();
-					JOptionPane.showMessageDialog(Frame.this,
-							"Export exception caught:\n" + e1.getMessage()
-									+ "\nStack trace was written to console",
-							"I/O Error", JOptionPane.ERROR_MESSAGE);
-					return;
-				} catch (Exception e1) {
-					JOptionPane.showMessageDialog(Frame.this,
-							"Exception caught:\n" + e1.getMessage(), "Some other kind of error",
-							JOptionPane.ERROR_MESSAGE);
-					return;
-				}
-				JOptionPane.showMessageDialog(Frame.this, "Completed successfully", "Completed",
-						JOptionPane.INFORMATION_MESSAGE);
-			}
-		});
+		but.addActionListener(alistener);
 		pack();
 	}
 
