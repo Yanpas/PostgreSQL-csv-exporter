@@ -27,7 +27,7 @@ import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.UIManager;
 
-class Retriever {
+class Retriever implements AutoCloseable {
 	private String out_dir;
 	private Connection con;
 	private final String uri = "jdbc:postgresql://";
@@ -38,22 +38,12 @@ class Retriever {
 		con = DriverManager.getConnection(uri + address + "/" + db_name, user, password);
 	}
 
-	private void appendTables() {
-		try {
-			DatabaseMetaData dbmd = con.getMetaData();
-			ResultSet tabs = dbmd.getTables(null, null, "%", new String[] { "TABLE" });
-			while (tabs.next())
-				tables.add(tabs.getString("TABLE_NAME"));
+	private void appendTables() throws SQLException {
+		DatabaseMetaData dbmd = con.getMetaData();
+		ResultSet tabs = dbmd.getTables(null, null, "%", new String[] { "TABLE" });
+		while (tabs.next())
+			tables.add(tabs.getString("TABLE_NAME"));
 
-		} catch (SQLException sqlEx) {
-			sqlEx.printStackTrace();
-			try {
-				con.close();
-			} catch (SQLException e) {
-				e.printStackTrace();
-				System.exit(-1);
-			}
-		}
 	}
 
 	private void exportTable(String table_name) throws SQLException, IOException, Exception {
@@ -96,6 +86,14 @@ class Retriever {
 			exportTable(t);
 	}
 
+	@Override
+	public void close() {
+		try {
+			con.close();
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+	}
 }
 
 @SuppressWarnings("serial")
@@ -128,11 +126,9 @@ class Frame extends JFrame {
 				return;
 			}
 
-			try {
-				Retriever r =
-						new Retriever(username_t.getText(), password_t.getText(),
-								db_name_t.getText(), addr_t.getText());
-				r.exportAll(outputdir);
+			try (Retriever retr = new Retriever(username_t.getText(), password_t.getText(),
+							db_name_t.getText(), addr_t.getText())) {
+				retr.exportAll(outputdir);
 			} catch (SQLException e1) {
 				e1.printStackTrace();
 				JOptionPane.showMessageDialog(Frame.this,
@@ -193,11 +189,11 @@ class Frame extends JFrame {
 
 public class App {
 	public static void main(String[] args) {
-		if (args.length > 0 && args[0].equals("-cli")) {
-			try {
-				Retriever r = new Retriever(args[1], args[2], args[3], args[4]);
+		if (args.length >= 5 && args[0].equals("-cli")) {
+			try (Retriever r = new Retriever(args[1], args[2], args[3], args[4])) {
 				r.exportAll("csvs");
 			} catch (Exception e) {
+				System.out.println("Failed\n" + e.getLocalizedMessage());
 				e.printStackTrace();
 			}
 		} else {
